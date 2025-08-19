@@ -2,20 +2,43 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import RequireAuth from "../../components/RequireAuth";
+import { downloadCSV } from "../../lib/csv";
+import { useRole } from "../../lib/useRole";
 
 function Input({ className = "", ...props }) {
-  return <input className={"w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 " + className} {...props} />;
+  return (
+    <input
+      className={
+        "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 " +
+        className
+      }
+      {...props}
+    />
+  );
 }
 function Select({ className = "", ...props }) {
-  return <select className={"w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 " + className} {...props} />;
+  return (
+    <select
+      className={
+        "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 " +
+        className
+      }
+      {...props}
+    />
+  );
 }
 function Button({ variant = "primary", className = "", ...props }) {
-  const base = "rounded-lg px-3 py-2 text-sm font-medium shadow disabled:opacity-50 disabled:cursor-not-allowed";
-  const styles = variant === "ghost" ? "bg-white hover:bg-gray-100 border border-gray-300 text-gray-700" : "bg-indigo-600 text-white hover:bg-indigo-700";
+  const base =
+    "rounded-lg px-3 py-2 text-sm font-medium shadow disabled:opacity-50 disabled:cursor-not-allowed";
+  const styles =
+    variant === "ghost"
+      ? "bg-white hover:bg-gray-100 border border-gray-300 text-gray-700"
+      : "bg-indigo-600 text-white hover:bg-indigo-700";
   return <button className={`${base} ${styles} ${className}`} {...props} />;
 }
 
 export default function RecetasPage() {
+  const { isAdmin } = useRole();
   const [recipes, setRecipes] = useState([]);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -27,29 +50,47 @@ export default function RecetasPage() {
   const [adding, setAdding] = useState(false);
   const [ingForm, setIngForm] = useState({ recipe_id: "", item_id: "", qty: "" });
 
-  const filtered = useMemo(() => (!q ? recipes : recipes.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))), [q, recipes]);
+  const filtered = useMemo(
+    () => (!q ? recipes : recipes.filter((r) => r.name.toLowerCase().includes(q.toLowerCase()))),
+    [q, recipes]
+  );
 
   async function loadAll() {
     setLoading(true);
-    const { data: i } = await supabase.from("inventory_items").select("id, sku, name, unit").order("name");
+    const { data: i } = await supabase
+      .from("inventory_items")
+      .select("id, sku, name, unit")
+      .order("name");
     setItems(i || []);
     const { data: r } = await supabase
       .from("recipes")
-      .select("id, name, yield_quantity, yield_unit, created_at, recipe_ingredients ( qty, inventory_items ( id, name, unit, sku ) )")
+      .select(
+        "id, name, yield_quantity, yield_unit, created_at, recipe_ingredients ( qty, inventory_items ( id, name, unit, sku ) )"
+      )
       .order("created_at", { ascending: false });
     const norm = (r || []).map((rec) => ({
       ...rec,
-      ingredients: (rec.recipe_ingredients || []).map((ri) => ({ qty: ri.qty, item: ri.inventory_items })) || [],
+      ingredients:
+        (rec.recipe_ingredients || []).map((ri) => ({
+          qty: ri.qty,
+          item: ri.inventory_items,
+        })) || [],
     }));
     setRecipes(norm);
     setLoading(false);
   }
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => {
+    loadAll();
+  }, []);
 
   async function createRecipe(e) {
     e.preventDefault();
     setCreating(true);
-    const payload = { name: form.name.trim(), yield_quantity: Number(form.yield_quantity) || 0, yield_unit: form.yield_unit.trim() };
+    const payload = {
+      name: form.name.trim(),
+      yield_quantity: Number(form.yield_quantity) || 0,
+      yield_unit: form.yield_unit.trim(),
+    };
     const { error } = await supabase.from("recipes").insert(payload);
     setCreating(false);
     if (error) return alert("Error creando receta: " + error.message);
@@ -61,8 +102,14 @@ export default function RecetasPage() {
     e.preventDefault();
     setAdding(true);
     const qty = Number(ingForm.qty);
-    if (!ingForm.recipe_id || !ingForm.item_id || !qty || qty <= 0) { setAdding(false); return alert("Llena receta, ítem y cantidad (> 0)."); }
-    const { error } = await supabase.from("recipe_ingredients").upsert([{ recipe_id: ingForm.recipe_id, item_id: ingForm.item_id, qty }], { onConflict: "recipe_id,item_id" });
+    if (!ingForm.recipe_id || !ingForm.item_id || !qty || qty <= 0) {
+      setAdding(false);
+      return alert("Llena receta, ítem y cantidad (> 0).");
+    }
+    const { error } = await supabase.from("recipe_ingredients").upsert(
+      [{ recipe_id: ingForm.recipe_id, item_id: ingForm.item_id, qty }],
+      { onConflict: "recipe_id,item_id" }
+    );
     setAdding(false);
     if (error) return alert("Error agregando ingrediente: " + error.message);
     setIngForm({ recipe_id: "", item_id: "", qty: "" });
@@ -71,7 +118,11 @@ export default function RecetasPage() {
 
   async function removeIngredient(recipe_id, item_id) {
     if (!confirm("¿Eliminar ingrediente de la receta?")) return;
-    const { error } = await supabase.from("recipe_ingredients").delete().eq("recipe_id", recipe_id).eq("item_id", item_id);
+    const { error } = await supabase
+      .from("recipe_ingredients")
+      .delete()
+      .eq("recipe_id", recipe_id)
+      .eq("item_id", item_id);
     if (error) return alert("Error eliminando ingrediente: " + error.message);
     await loadAll();
   }
@@ -83,13 +134,53 @@ export default function RecetasPage() {
     await loadAll();
   }
 
+  function exportRecetasCSV() {
+    const headers = ["id", "nombre", "rendimiento", "unidad"];
+    const rows = recipes.map((r) => [
+      r.id,
+      r.name,
+      Number(r.yield_quantity ?? 0),
+      r.yield_unit,
+    ]);
+    downloadCSV("recetas.csv", headers, rows);
+  }
+
+  function exportIngredientesCSV() {
+    const headers = ["receta", "sku", "ingrediente", "cantidad", "unidad"];
+    const rows = [];
+    recipes.forEach((r) => {
+      (r.ingredients || []).forEach((ing) => {
+        rows.push([
+          r.name,
+          ing.item?.sku || "",
+          ing.item?.name || "",
+          Number(ing.qty ?? 0),
+          ing.item?.unit || "",
+        ]);
+      });
+    });
+    downloadCSV("recetas_ingredientes.csv", headers, rows);
+  }
+
   return (
     <RequireAuth>
       <div className="grid gap-6">
         <div className="rounded-2xl bg-white p-6 shadow">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-semibold">Recetas</h2>
-            <Input placeholder="Buscar receta por nombre…" value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Buscar receta por nombre…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+              <Button variant="ghost" onClick={exportRecetasCSV}>
+                Recetas CSV
+              </Button>
+              <Button variant="ghost" onClick={exportIngredientesCSV}>
+                Ingredientes CSV
+              </Button>
+            </div>
           </div>
 
           {loading ? (
@@ -103,9 +194,15 @@ export default function RecetasPage() {
                   <div className="mb-2 flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-semibold">{r.name}</h3>
-                      <p className="text-xs text-gray-500">Rendimiento: {Number(r.yield_quantity).toFixed(2)} {r.yield_unit}</p>
+                      <p className="text-xs text-gray-500">
+                        Rendimiento: {Number(r.yield_quantity).toFixed(2)} {r.yield_unit}
+                      </p>
                     </div>
-                    <Button variant="ghost" onClick={() => deleteRecipe(r.id)}>Eliminar</Button>
+                    {isAdmin && (
+                      <Button variant="ghost" onClick={() => deleteRecipe(r.id)}>
+                        Eliminar
+                      </Button>
+                    )}
                   </div>
 
                   <table className="w-full text-sm">
@@ -126,12 +223,21 @@ export default function RecetasPage() {
                           <td className="p-2">{Number(ing.qty).toFixed(2)}</td>
                           <td className="p-2">{ing.item.unit}</td>
                           <td className="p-2">
-                            <Button variant="ghost" onClick={() => removeIngredient(r.id, ing.item.id)}>Quitar</Button>
+                            <Button
+                              variant="ghost"
+                              onClick={() => removeIngredient(r.id, ing.item.id)}
+                            >
+                              Quitar
+                            </Button>
                           </td>
                         </tr>
                       ))}
                       {r.ingredients.length === 0 && (
-                        <tr><td className="p-3 text-gray-500" colSpan={5}>Sin ingredientes.</td></tr>
+                        <tr>
+                          <td className="p-3 text-gray-500" colSpan={5}>
+                            Sin ingredientes.
+                          </td>
+                        </tr>
                       )}
                     </tbody>
                   </table>
@@ -146,20 +252,50 @@ export default function RecetasPage() {
           <h3 className="mb-3 text-lg font-semibold">Crear receta</h3>
           <form onSubmit={createRecipe} className="grid gap-3 md:grid-cols-4">
             <div className="md:col-span-2">
-              <label className="mb-1 block text-xs font-medium text-gray-600">Nombre</label>
-              <Input placeholder="Ej. IPA 5%" value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} required />
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Nombre
+              </label>
+              <Input
+                placeholder="Ej. IPA 5%"
+                value={form.name}
+                onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))}
+                required
+              />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Rendimiento</label>
-              <Input type="number" step="0.01" value={form.yield_quantity} onChange={(e) => setForm((s) => ({ ...s, yield_quantity: e.target.value }))} required />
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Rendimiento
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                value={form.yield_quantity}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, yield_quantity: e.target.value }))
+                }
+                required
+              />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium text-gray-600">Unidad</label>
-              <Select value={form.yield_unit} onChange={(e) => setForm((s) => ({ ...s, yield_unit: e.target.value }))}>
-                <option value="L">L</option><option value="u">u</option><option value="kg">kg</option>
+              <label className="mb-1 block text-xs font-medium text-gray-600">
+                Unidad
+              </label>
+              <Select
+                value={form.yield_unit}
+                onChange={(e) =>
+                  setForm((s) => ({ ...s, yield_unit: e.target.value }))
+                }
+              >
+                <option value="L">L</option>
+                <option value="u">u</option>
+                <option value="kg">kg</option>
               </Select>
             </div>
-            <div className="md:col-span-4"><Button disabled={creating}>{creating ? "Guardando…" : "Crear receta"}</Button></div>
+            <div className="md:col-span-4">
+              <Button disabled={creating}>
+                {creating ? "Guardando…" : "Crear receta"}
+              </Button>
+            </div>
           </form>
         </div>
 
@@ -167,30 +303,76 @@ export default function RecetasPage() {
         <div className="rounded-2xl bg-white p-6 shadow">
           <h3 className="mb-3 text-lg font-semibold">Agregar ingrediente</h3>
           {items.length === 0 ? (
-            <p className="text-sm text-amber-700">No hay ítems en inventario. Ve a <a className="underline" href="/inventario">Inventario</a> y crea al menos uno.</p>
+            <p className="text-sm text-amber-700">
+              No hay ítems en inventario. Ve a{" "}
+              <a className="underline" href="/inventario">
+                Inventario
+              </a>{" "}
+              y crea al menos uno.
+            </p>
           ) : recipes.length === 0 ? (
-            <p className="text-sm text-amber-700">No hay recetas. Crea una arriba y vuelve aquí.</p>
+            <p className="text-sm text-amber-700">
+              No hay recetas. Crea una arriba y vuelve aquí.
+            </p>
           ) : (
             <form onSubmit={addIngredient} className="grid gap-3 md:grid-cols-4">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Receta</label>
-                <Select value={ingForm.recipe_id} onChange={(e) => setIngForm((s) => ({ ...s, recipe_id: e.target.value }))} required>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Receta
+                </label>
+                <Select
+                  value={ingForm.recipe_id}
+                  onChange={(e) =>
+                    setIngForm((s) => ({ ...s, recipe_id: e.target.value }))
+                  }
+                  required
+                >
                   <option value="">Selecciona…</option>
-                  {recipes.map((r) => (<option key={r.id} value={r.id}>{r.name}</option>))}
+                  {recipes.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      {r.name}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div className="md:col-span-2">
-                <label className="mb-1 block text-xs font-medium text-gray-600">Ítem</label>
-                <Select value={ingForm.item_id} onChange={(e) => setIngForm((s) => ({ ...s, item_id: e.target.value }))} required>
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Ítem
+                </label>
+                <Select
+                  value={ingForm.item_id}
+                  onChange={(e) =>
+                    setIngForm((s) => ({ ...s, item_id: e.target.value }))
+                  }
+                  required
+                >
                   <option value="">Selecciona…</option>
-                  {items.map((i) => (<option key={i.id} value={i.id}>{i.name} ({i.sku}) — {i.unit}</option>))}
+                  {items.map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.name} ({i.sku}) — {i.unit}
+                    </option>
+                  ))}
                 </Select>
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-600">Cantidad</label>
-                <Input type="number" step="0.01" value={ingForm.qty} onChange={(e) => setIngForm((s) => ({ ...s, qty: e.target.value }))} required />
+                <label className="mb-1 block text-xs font-medium text-gray-600">
+                  Cantidad
+                </label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={ingForm.qty}
+                  onChange={(e) =>
+                    setIngForm((s) => ({ ...s, qty: e.target.value }))
+                  }
+                  required
+                />
               </div>
-              <div className="md:col-span-4"><Button disabled={adding}>{adding ? "Agregando…" : "Agregar ingrediente"}</Button></div>
+              <div className="md:col-span-4">
+                <Button disabled={adding}>
+                  {adding ? "Agregando…" : "Agregar ingrediente"}
+                </Button>
+              </div>
             </form>
           )}
         </div>
@@ -198,4 +380,3 @@ export default function RecetasPage() {
     </RequireAuth>
   );
 }
-
