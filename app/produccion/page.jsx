@@ -222,4 +222,237 @@ export default function ProduccionPage() {
     if (!runs.length) return { A: 0, P: 0, Q: 0, OEE: 0 };
     const n = runs.length;
     const sum = runs.reduce(
-      (acc, r) =>
+      (acc, r) => ({
+        A: acc.A + r._oee.A,
+        P: acc.P + r._oee.P,
+        Q: acc.Q + r._oee.Q,
+        OEE: acc.OEE + r._oee.OEE,
+      }),
+      { A: 0, P: 0, Q: 0, OEE: 0 }
+    );
+    return {
+      A: Number((sum.A / n).toFixed(3)),
+      P: Number((sum.P / n).toFixed(3)),
+      Q: Number((sum.Q / n).toFixed(3)),
+      OEE: Number((sum.OEE / n).toFixed(3)),
+    };
+  }, [runs]);
+
+  return (
+    <div className="grid gap-6">
+      {/* KPIs */}
+      <div className="grid gap-4 md:grid-cols-4">
+        {[
+          { label: "Availability", value: kpi.A },
+          { label: "Performance", value: kpi.P },
+          { label: "Quality", value: kpi.Q },
+          { label: "OEE", value: kpi.OEE },
+        ].map((c) => (
+          <div key={c.label} className="rounded-2xl bg-white p-4 shadow">
+            <div className="text-sm text-gray-500">{c.label}</div>
+            <div className="text-2xl font-bold">{(c.value * 100).toFixed(1)}%</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Crear corrida */}
+      <div className="rounded-2xl bg-white p-6 shadow">
+        <h3 className="mb-3 text-lg font-semibold">Registrar producción</h3>
+        <form onSubmit={createRun} className="grid gap-3 md:grid-cols-4">
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Máquina</label>
+            <Select
+              value={form.machine_id}
+              onChange={(e) => setForm((s) => ({ ...s, machine_id: e.target.value }))}
+              required
+            >
+              <option value="">Selecciona…</option>
+              {machines.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name} ({m.code})
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Receta (opcional)</label>
+            <Select
+              value={form.recipe_id}
+              onChange={(e) => setForm((s) => ({ ...s, recipe_id: e.target.value }))}
+            >
+              <option value="">—</option>
+              {recipes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Inicio</label>
+            <Input
+              type="datetime-local"
+              value={form.started_at}
+              onChange={(e) => setForm((s) => ({ ...s, started_at: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Fin</label>
+            <Input
+              type="datetime-local"
+              value={form.ended_at}
+              onChange={(e) => setForm((s) => ({ ...s, ended_at: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Tiempo planificado (min)</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.planned_time_min}
+              onChange={(e) => setForm((s) => ({ ...s, planned_time_min: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Paros (min)</label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.downtime_min}
+              onChange={(e) => setForm((s) => ({ ...s, downtime_min: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Tiempo ciclo ideal (s/u)</label>
+            <Input
+              type="number"
+              step="0.0001"
+              value={form.ideal_cycle_time_sec}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, ideal_cycle_time_sec: e.target.value }))
+              }
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Buenas (unidades)</label>
+            <Input
+              type="number"
+              step="1"
+              value={form.good_count}
+              onChange={(e) => setForm((s) => ({ ...s, good_count: e.target.value }))}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">Rechazo (unidades)</label>
+            <Input
+              type="number"
+              step="1"
+              value={form.reject_count}
+              onChange={(e) => setForm((s) => ({ ...s, reject_count: e.target.value }))}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs font-medium text-gray-600">
+              Batches para consumo (si hay receta)
+            </label>
+            <Input
+              type="number"
+              step="0.01"
+              value={form.batches_for_consumption}
+              onChange={(e) =>
+                setForm((s) => ({ ...s, batches_for_consumption: e.target.value }))
+              }
+            />
+            <p className="mt-1 text-[11px] text-gray-500">
+              1 batch = cantidades definidas en la receta. Se descuenta del inventario.
+            </p>
+          </div>
+
+          <div className="md:col-span-4">
+            <label className="mb-1 block text-xs font-medium text-gray-600">Notas</label>
+            <Input
+              placeholder="Opcional"
+              value={form.notes}
+              onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))}
+            />
+          </div>
+
+          <div className="md:col-span-4">
+            <Button disabled={creating}>{creating ? "Guardando…" : "Registrar corrida"}</Button>
+          </div>
+        </form>
+      </div>
+
+      {/* Listado de corridas */}
+      <div className="rounded-2xl bg-white p-6 shadow">
+        <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <h3 className="text-lg font-semibold">Últimas corridas</h3>
+          <Input
+            placeholder="Buscar por máquina o receta…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-600">
+                <th className="p-2">Fecha</th>
+                <th className="p-2">Máquina</th>
+                <th className="p-2">Receta</th>
+                <th className="p-2">A</th>
+                <th className="p-2">P</th>
+                <th className="p-2">Q</th>
+                <th className="p-2">OEE</th>
+                <th className="p-2">Buenas</th>
+                <th className="p-2">Rechazo</th>
+                <th className="p-2">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((r) => (
+                <tr key={r.id} className="border-t">
+                  <td className="p-2">{new Date(r.started_at).toLocaleString()}</td>
+                  <td className="p-2">{r.machines?.name} <span className="text-gray-400">({r.machines?.code})</span></td>
+                  <td className="p-2">{r.recipes?.name || "—"}</td>
+                  <td className="p-2">{(r._oee.A * 100).toFixed(1)}%</td>
+                  <td className="p-2">{(r._oee.P * 100).toFixed(1)}%</td>
+                  <td className="p-2">{(r._oee.Q * 100).toFixed(1)}%</td>
+                  <td className="p-2 font-semibold">{(r._oee.OEE * 100).toFixed(1)}%</td>
+                  <td className="p-2">{r.good_count}</td>
+                  <td className="p-2">{r.reject_count}</td>
+                  <td className="p-2">
+                    <Button variant="ghost" onClick={() => deleteRun(r.id)}>Eliminar</Button>
+                  </td>
+                </tr>
+              ))}
+              {!loading && filtered.length === 0 && (
+                <tr>
+                  <td className="p-3 text-gray-500" colSpan={10}>
+                    No hay corridas aún.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
