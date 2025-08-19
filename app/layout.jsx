@@ -1,3 +1,4 @@
+import './globals.css';
 export const metadata = {
   title: "OEE 3 Gatos",
   description: "Panel de OEE, Mantenimiento e Inventario",
