@@ -1,9 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
+import { useRole } from "../lib/useRole";
 
 export default function Topbar() {
   const [user, setUser] = useState(null);
+  const { isAdmin } = useRole();
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => setUser(user));
@@ -16,13 +18,16 @@ export default function Topbar() {
   const logout = async () => { await supabase.auth.signOut(); };
 
   return (
-    <nav className="space-x-2 text-sm">
+    <nav className="flex flex-wrap items-center gap-2 text-sm">
       <a className="px-3 py-2 rounded-lg bg-white shadow hover:bg-gray-100" href="/">Dashboard</a>
       <a className="px-3 py-2 rounded-lg bg-white shadow hover:bg-gray-100" href="/mantenimiento">Mantenimientos</a>
       <a className="px-3 py-2 rounded-lg bg-white shadow hover:bg-gray-100" href="/inventario">Inventario</a>
       <a className="px-3 py-2 rounded-lg bg-white shadow hover:bg-gray-100" href="/recetas">Recetas</a>
       <a className="px-3 py-2 rounded-lg bg-white shadow hover:bg-gray-100" href="/produccion">Producción</a>
-
+      {isAdmin && (
+        <a className="px-3 py-2 rounded-lg bg-white shadow hover:bg-gray-100" href="/auditoria">Auditoría</a>
+      )}
+      <span className="grow" />
       {user ? (
         <button className="px-3 py-2 rounded-lg bg-gray-900 text-white hover:bg-black" onClick={logout}>
           Cerrar sesión
