@@ -1,11 +1,12 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../../lib/supabaseClient";
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
-  const next = useSearchParams().get("next") || "/";
+  const params = useSearchParams();
+  const next = params?.get("next") || "/";
 
   const [mode, setMode] = useState("signin"); // "signin" | "signup" | "magic"
   const [email, setEmail] = useState("");
@@ -74,3 +75,12 @@ export default function LoginPage() {
     </div>
   );
 }
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow text-sm text-gray-500">Cargando…</div>}>
+      <LoginInner />
+    </Suspense>
+  );
+}
+
